@@ -174,3 +174,47 @@ class ReadMessageViewTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.message.refresh_from_db()
         self.assertEqual(self.message.is_read, True)
+
+
+class DeleteMessageViewTestCase(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            "testuser", "testuser@example.com", "testpassword"
+        )
+        self.sender = User.objects.create_user(
+            "sender", "sender@example.com", "testpassword"
+        )
+        self.receiver = User.objects.create_user(
+            "receiver", "receiver@example.com", "testpassword"
+        )
+        self.message = Message.objects.create(
+            sender=self.sender,
+            receiver=self.receiver,
+            subject="Test Subject",
+            message="Test message content",
+            is_read=False,
+        )
+        self.url = reverse("messaging:delete-message", kwargs={"pk": self.message.pk})
+
+    def test_delete_message_as_receiver(self):
+        self.client.force_authenticate(user=self.receiver)
+        response = self.client.delete(self.url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Message.objects.filter(pk=self.message.pk).exists())
+
+    def test_delete_message_as_sender(self):
+        self.client.force_authenticate(user=self.sender)
+        response = self.client.delete(self.url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Message.objects.filter(pk=self.message.pk).exists())
+
+    def test_delete_message_as_unrelated_user(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.delete(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Message.objects.filter(pk=self.message.pk).exists())
+
+    def test_delete_message_unauthenticated(self):
+        response = self.client.delete(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Message.objects.filter(pk=self.message.pk).exists())
