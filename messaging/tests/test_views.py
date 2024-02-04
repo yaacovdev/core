@@ -120,3 +120,57 @@ class UnreadMessagesListViewTestCase(APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["id"], self.message.id)
         self.assertEqual(response.data[0]["is_read"], False)
+
+
+class ReadMessageViewTestCase(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            "testuser", "testuser@example.com", "testpassword"
+        )
+        self.message = Message.objects.create(
+            sender=self.user,
+            receiver=self.user,
+            subject="Test Subject",
+            message="Test message content",
+            is_read=False,
+        )
+        self.url = reverse("messaging:read-message", kwargs={"pk": self.message.pk})
+
+    def test_read_message_authenticated_receiver(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["is_read"], True)
+        self.message.refresh_from_db()
+        self.assertEqual(self.message.is_read, True)
+
+    def test_read_message_unauthenticated(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_read_message_authenticated_sender(self):
+        sender = User.objects.create_user(
+            "sender", "sender@example.com", "testpassword"
+        )
+        self.client.force_authenticate(user=sender)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.message.refresh_from_db()
+        self.assertEqual(self.message.is_read, False)
+
+    def test_read_message_authenticated_different_receiver(self):
+        receiver = User.objects.create_user(
+            "receiver", "receiver@example.com", "testpassword"
+        )
+        self.client.force_authenticate(user=receiver)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.message.refresh_from_db()
+        self.assertEqual(self.message.is_read, False)
+
+    def test_after_read_message_the_message_is_read(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.message.refresh_from_db()
+        self.assertEqual(self.message.is_read, True)

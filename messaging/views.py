@@ -1,5 +1,5 @@
 from rest_framework import status
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -53,3 +53,33 @@ class UnreadMessagesListView(ListAPIView):
     def get_queryset(self):
         user = self.request.user
         return Message.objects.filter(receiver=user, is_read=False)
+
+
+class ReadMessageView(RetrieveAPIView):
+    """
+    View for reading a message.
+
+    Retrieves a message object and updates its 'is_read' field to True if it is not already read.
+    Only the receiver of the message can read it.
+
+    Inherits from RetrieveAPIView class and uses MessageSerializer for serialization.
+    Requires authentication for accessing the view.
+    """
+
+    queryset = Message.objects.all()
+    serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        message = self.get_object()
+        if message.receiver != request.user:
+            return Response(
+                {"message": "We can only read your messages."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not message.is_read:
+            message.is_read = True
+            message.save(update_fields=["is_read"])
+
+        return self.retrieve(request, *args, **kwargs)
