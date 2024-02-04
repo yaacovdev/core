@@ -1,7 +1,8 @@
+from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from django.contrib.auth.models import User
+
 from ..models import Message
 from ..serializers import MessageSerializer
 
@@ -48,4 +49,22 @@ class SendMessageViewTestCase(APITestCase):
 
     def test_send_message_without_authentication(self):
         response = self.client.post(self.url, self.valid_payload)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class UserMessagesListViewTestCase(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            "testuser", "testuser@example.com", "testpassword"
+        )
+        self.url = reverse("messaging:user-messages-list")
+
+    def test_get_user_messages_list_authenticated(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)  # Assuming no messages for the user
+
+    def test_get_user_messages_list_unauthenticated(self):
+        response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
