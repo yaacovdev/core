@@ -40,3 +40,16 @@ class UserMessagesListView(ListAPIView):
     def get_queryset(self):
         user = self.request.user
         return Message.objects.filter(receiver=user)
+
+
+class UnreadMessagesListView(ListAPIView):
+    """
+    API view to retrieve a list of unread messages for the authenticated user.
+    """
+
+    serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return Message.objects.filter(receiver=user, is_read=False)

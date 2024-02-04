@@ -58,13 +58,65 @@ class UserMessagesListViewTestCase(APITestCase):
             "testuser", "testuser@example.com", "testpassword"
         )
         self.url = reverse("messaging:user-messages-list")
+        # create a message for the user
+        self.message = Message.objects.create(
+            sender=self.user,
+            receiver=self.user,
+            subject="Test Subject",
+            message="Test message content",
+            is_read=False,
+        )
 
     def test_get_user_messages_list_authenticated(self):
         self.client.force_authenticate(user=self.user)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)  # Assuming no messages for the user
+        self.assertEqual(len(response.data), 1)  # Assuming 1 message for the user
 
     def test_get_user_messages_list_unauthenticated(self):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class UnreadMessagesListViewTestCase(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            "testuser", "testuser@example.com", "testpassword"
+        )
+        self.url = reverse("messaging:unread-messages-list")
+        # Create a unred message for the user
+        self.message = Message.objects.create(
+            sender=self.user,
+            receiver=self.user,
+            subject="Test Subject",
+            message="Test message content",
+            is_read=False,
+        )
+        self.message.save()
+        # Create a read message for the user
+        self.read_message = Message.objects.create(
+            sender=self.user,
+            receiver=self.user,
+            subject="Test Subject",
+            message="Test message content",
+            is_read=True,
+        )
+        self.read_message.save()
+
+    def test_get_unread_messages_list_authenticated(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+    def test_get_unread_messages_list_unauthenticated(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_get_unread_messages_list_authenticated_with_unread_messages(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["id"], self.message.id)
+        self.assertEqual(response.data[0]["is_read"], False)
