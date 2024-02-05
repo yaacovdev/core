@@ -54,24 +54,36 @@ class SendMessageViewTestCase(APITestCase):
 
 class UserMessagesListViewTestCase(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(
+        self.sender = User.objects.create_user(
             "testuser", "testuser@example.com", "testpassword"
         )
+        self.receiver = User.objects.create_user(
+            "receiver", "receiver@example.com", "testpassword"
+        )
+
         self.url = reverse("messaging:user-messages-list")
         # create a message for the user
         self.message = Message.objects.create(
-            sender=self.user,
-            receiver=self.user,
+            sender=self.sender,
+            receiver=self.receiver,
+            subject="Test Subject",
+            message="Test message content",
+            is_read=False,
+        )
+        self.unread_message_inverse_receive = Message.objects.create(
+            sender=self.receiver,
+            receiver=self.sender,
             subject="Test Subject",
             message="Test message content",
             is_read=False,
         )
 
     def test_get_user_messages_list_authenticated(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.sender)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)  # Assuming 1 message for the user
+        self.assertEqual(len(response.data.get("sent_messages")), 1)
+        self.assertEqual(len(response.data.get("received_messages")), 1)
 
     def test_get_user_messages_list_unauthenticated(self):
         response = self.client.get(self.url)
@@ -80,23 +92,33 @@ class UserMessagesListViewTestCase(APITestCase):
 
 class UnreadMessagesListViewTestCase(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(
+        self.sender = User.objects.create_user(
             "testuser", "testuser@example.com", "testpassword"
+        )
+        self.receiver = User.objects.create_user(
+            "receiver", "receiver@example.com", "testpassword"
         )
         self.url = reverse("messaging:unread-messages-list")
         # Create a unred message for the user
         self.message = Message.objects.create(
-            sender=self.user,
-            receiver=self.user,
+            sender=self.sender,
+            receiver=self.receiver,
             subject="Test Subject",
             message="Test message content",
             is_read=False,
         )
         self.message.save()
+        self.unread_message_inverse_receive = Message.objects.create(
+            sender=self.receiver,
+            receiver=self.sender,
+            subject="Test Subject",
+            message="Test message content",
+            is_read=False,
+        )
         # Create a read message for the user
         self.read_message = Message.objects.create(
-            sender=self.user,
-            receiver=self.user,
+            sender=self.sender,
+            receiver=self.receiver,
             subject="Test Subject",
             message="Test message content",
             is_read=True,
@@ -104,76 +126,86 @@ class UnreadMessagesListViewTestCase(APITestCase):
         self.read_message.save()
 
     def test_get_unread_messages_list_authenticated(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.sender)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data.get("sent_messages")), 1)
+        self.assertEqual(len(response.data.get("received_messages")), 1)
 
     def test_get_unread_messages_list_unauthenticated(self):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_get_unread_messages_list_authenticated_with_unread_messages(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.sender)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["id"], self.message.id)
-        self.assertEqual(response.data[0]["is_read"], False)
+        self.assertEqual(len(response.data.get("sent_messages")), 1)
+        self.assertEqual(response.data.get("sent_messages")[0]["is_read"], False)
 
 
 class ReadMessageViewTestCase(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(
+        self.sender = User.objects.create_user(
             "testuser", "testuser@example.com", "testpassword"
         )
+        self.receiver = User.objects.create_user(
+            "receiver", "receiver@example.com", "testpassword"
+        )
         self.message = Message.objects.create(
-            sender=self.user,
-            receiver=self.user,
+            sender=self.sender,
+            receiver=self.receiver,
             subject="Test Subject",
             message="Test message content",
             is_read=False,
         )
         self.url = reverse("messaging:read-message", kwargs={"pk": self.message.pk})
 
+    def test_read_message_unauthenticated(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_read_message_authenticated_receiver(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.receiver)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["is_read"], True)
         self.message.refresh_from_db()
         self.assertEqual(self.message.is_read, True)
 
-    def test_read_message_unauthenticated(self):
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_read_message_authenticated_sender(self):
-        sender = User.objects.create_user(
-            "sender", "sender@example.com", "testpassword"
-        )
-        self.client.force_authenticate(user=sender)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.message.refresh_from_db()
-        self.assertEqual(self.message.is_read, False)
-
     def test_read_message_authenticated_different_receiver(self):
-        receiver = User.objects.create_user(
-            "receiver", "receiver@example.com", "testpassword"
+        user = User.objects.create_user(
+            "testuserdifferent", "testuserdifferent@example.com", "differenttestpassword"
         )
-        self.client.force_authenticate(user=receiver)
+        self.client.force_authenticate(user=user)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.message.refresh_from_db()
         self.assertEqual(self.message.is_read, False)
 
     def test_after_read_message_the_message_is_read(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.receiver)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.message.refresh_from_db()
         self.assertEqual(self.message.is_read, True)
+
+    def test_read_message_authenticated_sender_not_mark_as_read(self):
+        message = Message.objects.create(
+            sender=self.sender,
+            receiver=self.receiver,
+            subject="Test Subject",
+            message="Test message content",
+            is_read=False,
+        )
+        url = reverse("messaging:read-message", kwargs={"pk": message.pk})
+
+        self.client.force_authenticate(user=self.sender)
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        message.refresh_from_db()
+        self.assertEqual(message.is_read, False)
 
 
 class DeleteMessageViewTestCase(APITestCase):

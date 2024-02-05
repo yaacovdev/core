@@ -1,6 +1,5 @@
 from rest_framework import status
-from rest_framework.generics import (DestroyAPIView, ListAPIView,
-                                     RetrieveAPIView)
+from rest_framework.generics import DestroyAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -37,10 +36,23 @@ class UserMessagesListView(ListAPIView):
 
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        user = self.request.user
-        return Message.objects.filter(receiver=user)
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        sent_messages = Message.objects.filter(sender=user)
+        received_messages = Message.objects.filter(receiver=user)
+
+        # Serialize the data
+        sent_messages_serializer = self.get_serializer(sent_messages, many=True)
+        received_messages_serializer = self.get_serializer(received_messages, many=True)
+
+        return Response(
+            {
+                "sent_messages": sent_messages_serializer.data,
+                "received_messages": received_messages_serializer.data,
+            }
+        )
 
 
 class UnreadMessagesListView(ListAPIView):
@@ -51,9 +63,21 @@ class UnreadMessagesListView(ListAPIView):
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        user = self.request.user
-        return Message.objects.filter(receiver=user, is_read=False)
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        sent_messages = Message.objects.filter(sender=user, is_read=False)
+        received_messages = Message.objects.filter(receiver=user, is_read=False)
+
+        # Serialize the data
+        sent_messages_serializer = self.get_serializer(sent_messages, many=True)
+        received_messages_serializer = self.get_serializer(received_messages, many=True)
+
+        return Response(
+            {
+                "sent_messages": sent_messages_serializer.data,
+                "received_messages": received_messages_serializer.data,
+            }
+        )
 
 
 class ReadMessageView(RetrieveAPIView):
@@ -61,8 +85,7 @@ class ReadMessageView(RetrieveAPIView):
     View for reading a message.
 
     Retrieves a message object and updates its 'is_read' field to True if it is not already read.
-    Only the receiver of the message can read it.
-
+    The receiver of the message can read and mark it as read. The sender can only mark it as read.
     Inherits from RetrieveAPIView class and uses MessageSerializer for serialization.
     Requires authentication for accessing the view.
     """
@@ -73,13 +96,14 @@ class ReadMessageView(RetrieveAPIView):
 
     def get(self, request, *args, **kwargs):
         message = self.get_object()
-        if message.receiver != request.user:
+
+        if message.receiver != request.user and message.sender != request.user:
             return Response(
-                {"message": "We can only read your messages."},
+                {"message": "You can only read messages sent to or by you."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if not message.is_read:
+        if message.receiver == request.user and not message.is_read:
             message.is_read = True
             message.save(update_fields=["is_read"])
 
