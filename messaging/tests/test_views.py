@@ -175,7 +175,9 @@ class ReadMessageViewTestCase(APITestCase):
 
     def test_read_message_authenticated_different_receiver(self):
         user = User.objects.create_user(
-            "testuserdifferent", "testuserdifferent@example.com", "differenttestpassword"
+            "testuserdifferent",
+            "testuserdifferent@example.com",
+            "differenttestpassword",
         )
         self.client.force_authenticate(user=user)
         response = self.client.get(self.url)

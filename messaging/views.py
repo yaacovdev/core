@@ -1,5 +1,4 @@
-from rest_framework import status
-from rest_framework.generics import DestroyAPIView, ListAPIView, RetrieveAPIView
+from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -28,7 +27,7 @@ class SendMessageView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UserMessagesListView(ListAPIView):
+class UserMessagesListView(generics.ListAPIView):
     """
     API view for retrieving messages for a specific user.
     Only authenticated users are allowed to access this view.
@@ -55,7 +54,7 @@ class UserMessagesListView(ListAPIView):
         )
 
 
-class UnreadMessagesListView(ListAPIView):
+class UnreadMessagesListView(generics.ListAPIView):
     """
     API view to retrieve a list of unread messages for the authenticated user.
     """
@@ -80,7 +79,7 @@ class UnreadMessagesListView(ListAPIView):
         )
 
 
-class ReadMessageView(RetrieveAPIView):
+class ReadMessageView(generics.RetrieveAPIView):
     """
     View for reading a message.
 
@@ -110,7 +109,7 @@ class ReadMessageView(RetrieveAPIView):
         return self.retrieve(request, *args, **kwargs)
 
 
-class DeleteMessageView(DestroyAPIView):
+class DeleteMessageView(generics.DestroyAPIView):
     """
     View for deleting a message.
 

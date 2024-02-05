@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 import os
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List, cast
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-jm0-#90c42oo)t8honpo9c5#6nl5dres+1cu(p&-h2c=rr!kb&"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS: List[str] = [
     "messaging-system-0a4a6d9ca7d4.herokuapp.com",
@@ -88,7 +88,10 @@ DATABASES = {
 }
 if "DATABASE_URL" in os.environ:
     import dj_database_url
-    DATABASES["default"] = dj_database_url.config(conn_max_age=600, ssl_require=True)
+
+    DATABASES["default"] = cast(
+        Dict[str, Any], dj_database_url.config(conn_max_age=600, ssl_require=True)
+    )
 
 
 # Password validation
