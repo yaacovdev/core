@@ -29,6 +29,8 @@ DEBUG = False
 
 ALLOWED_HOSTS: List[str] = [
     "messaging-system-0a4a6d9ca7d4.herokuapp.com",
+    "localhost",
+    "127.0.0.1",
 ]
 
 
@@ -46,6 +48,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "messaging.error_middleware.ErrorMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
